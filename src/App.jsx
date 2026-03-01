@@ -1,34 +1,48 @@
-import { useEffect, useState } from "react";
-import { getMatches } from "./api/matchApi";
-import MatchForm from "./components/MatchForm";
-import MatchList from "./components/MatchList";
+import React, { useState } from "react";
+import { ChakraProvider, Tabs, TabList, TabPanels, Tab, TabPanel, Box, Button } from "@chakra-ui/react";
+import MatchCenter from "./components/MatchCenter";
+import CreateMatch from "./components/CreateMatch";
+import Players from "./components/Players";
 
 export default function App() {
-  const [matches, setMatches] = useState([]);
+  const [showCreateMatch, setShowCreateMatch] = useState(false);
 
-  const fetchMatches = async () => {
-    try {
-      const data = await getMatches();
-      setMatches(data);
-    } catch (err) {
-      console.error("Failed to fetch matches", err);
-    }
+  const handleNavigateToCreate = () => {
+    setShowCreateMatch(true);
   };
 
-  useEffect(() => {
-    fetchMatches();
-  }, []);
-
-  const handleMatchCreated = (newMatch) => {
-    setMatches((prev) => [...prev, newMatch]);
+  const handleBackToMatches = () => {
+    setShowCreateMatch(false);
   };
 
   return (
-    <div>
-      <h1>D-Beast Matches</h1>
-      <MatchForm onMatchCreated={handleMatchCreated} />
-      <hr />
-      <MatchList matches={matches} />
-    </div>
+    <ChakraProvider>
+      <Box p={5}>
+        {showCreateMatch ? (
+          <Box>
+            <Button mb={5} onClick={handleBackToMatches}>
+              ← Back to Match Center
+            </Button>
+            <CreateMatch />
+          </Box>
+        ) : (
+          <Tabs variant="enclosed" isFitted>
+            <TabList>
+              <Tab>Match Center</Tab>
+              <Tab>Players</Tab>
+            </TabList>
+
+            <TabPanels>
+              <TabPanel>
+                <MatchCenter onCreateClick={handleNavigateToCreate} />
+              </TabPanel>
+              <TabPanel>
+                <Players />
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        )}
+      </Box>
+    </ChakraProvider>
   );
 }
