@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { ChakraProvider, Tabs, TabList, TabPanels, Tab, TabPanel, Box, Button } from "@chakra-ui/react";
+import { ChakraProvider, Box, Button, Tabs, TabList, TabPanels, Tab, TabPanel } from "@chakra-ui/react";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
 import MatchCenter from "./components/MatchCenter";
 import CreateMatch from "./components/CreateMatch";
 import Players from "./components/Players";
@@ -7,17 +9,17 @@ import Players from "./components/Players";
 export default function App() {
   const [showCreateMatch, setShowCreateMatch] = useState(false);
 
-  const handleNavigateToCreate = () => {
-    setShowCreateMatch(true);
-  };
+  const handleNavigateToCreate = () => setShowCreateMatch(true);
+  const handleBackToMatches = () => setShowCreateMatch(false);
 
-  const handleBackToMatches = () => {
-    setShowCreateMatch(false);
+  const handleLogout = () => {
+    alert("Logout clicked! Implement your auth logic here.");
   };
 
   return (
     <ChakraProvider>
-      <Box p={5}>
+      <Header onLogout={handleLogout} />
+      <Box p={5} minH="70vh">
         {showCreateMatch ? (
           <Box>
             <Button mb={5} onClick={handleBackToMatches}>
@@ -43,6 +45,7 @@ export default function App() {
           </Tabs>
         )}
       </Box>
+      <Footer />
     </ChakraProvider>
   );
 }
