@@ -1,24 +1,32 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+
 # Logs
-logs
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Vite cache
+.vite/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Mac system files
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Optional: lock files (if you don’t want them in repo)
+package-lock.json
+yarn.lock
