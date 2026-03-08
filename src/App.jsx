@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import React, { useState } from "react";
 import Login from "./components/Login.jsx";
 import Register from "./components/Register.jsx";
-import MatchCenter from "./components/MatchCenter.jsx";
+import MatchCenter from "./components/MatchCenter/MatchCenter.jsx";
 
 function App() {
   const [user, setUser] = useState(() => {

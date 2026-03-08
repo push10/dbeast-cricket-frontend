@@ -1,0 +1,52 @@
+.match-center {
+  padding: 30px;
+  font-family: Arial;
+}
+
+.match-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.match-table th,
+.match-table td {
+  padding: 12px;
+  text-align: center;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Row colors */
+
+.row-green {
+  background-color: #e8f7e8;
+}
+
+.row-yellow {
+  background-color: #fff9db;
+}
+
+/* Buttons */
+
+.btn-available {
+  background: #22c55e;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btn-notavailable {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:hover {
+  opacity: 0.9;
+}
