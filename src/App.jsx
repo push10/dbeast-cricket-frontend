@@ -1,34 +1,28 @@
-import { useEffect, useState } from "react";
-import { getMatches } from "./api/matchApi";
-import MatchForm from "./components/MatchForm";
-import MatchList from "./components/MatchList";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import React, { useState } from "react";
+import Login from "./components/Login.jsx";
+import Register from "./components/Register.jsx";
+import MatchCenter from "./components/MatchCenter.jsx";
 
-export default function App() {
-  const [matches, setMatches] = useState([]);
+function App() {
+  const [user, setUser] = useState(() => {
 
-  const fetchMatches = async () => {
-    try {
-      const data = await getMatches();
-      setMatches(data);
-    } catch (err) {
-      console.error("Failed to fetch matches", err);
-    }
-  };
+    const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    fetchMatches();
-  }, []);
+    return token ? { token } : null;
 
-  const handleMatchCreated = (newMatch) => {
-    setMatches((prev) => [...prev, newMatch]);
-  };
+  });
 
   return (
-    <div>
-      <h1>D-Beast Matches</h1>
-      <MatchForm onMatchCreated={handleMatchCreated} />
-      <hr />
-      <MatchList matches={matches} />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />} />
+        <Route path="/login" element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/matches" element={user ? <MatchCenter /> : <Navigate to="/login" />} />
+      </Routes>
+    </Router>
   );
 }
+
+export default App;
