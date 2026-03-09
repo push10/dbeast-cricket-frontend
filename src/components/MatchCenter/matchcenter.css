@@ -1,52 +1,173 @@
 .match-center {
-  padding: 30px;
-  font-family: Arial;
+  padding: 1rem;
+  max-width: 1200px;
+  margin: auto;
 }
 
-.match-table {
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.match-card {
+  background: #1e1e2f;
+  color: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.match-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.card-green {
+  border-left: 6px solid #00c853;
+}
+
+.card-yellow {
+  border-left: 6px solid #ffea00;
+}
+
+.match-header {
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.ground {
+  font-size: 0.9rem;
+  color: #ccc;
+}
+
+.availability {
+  margin: 0.5rem 0;
+}
+
+.progress-bar {
+  background: #333;
+  border-radius: 6px;
+  height: 10px;
   width: 100%;
-  border-collapse: collapse;
+  overflow: hidden;
 }
 
-.match-table th,
-.match-table td {
-  padding: 12px;
-  text-align: center;
-  border-bottom: 1px solid #ddd;
+.progress {
+  background: #00c853;
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease-in-out;
 }
-
-/* Row colors */
-
-.row-green {
-  background-color: #e8f7e8;
-}
-
-.row-yellow {
-  background-color: #fff9db;
-}
-
-/* Buttons */
 
 .btn-available {
-  background: #22c55e;
-  color: white;
+  background: #00c853;
+  color: #fff;
+  width: 100%;
   border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 0.5rem;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.btn-available:hover {
+  background: #00b34a;
 }
 
 .btn-notavailable {
-  background: #ef4444;
-  color: white;
+  background: #ff3d00;
+  color: #fff;
+  width: 100%;
   border: none;
-  padding: 8px 16px;
-  border-radius: 20px;
+  padding: 0.5rem;
+  border-radius: 8px;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-notavailable:hover {
+  background: #e63600;
+}
+
+/* Toggle switch container */
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  width: 150px;
+  padding: 5px 10px;
+  border-radius: 25px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.3s ease;
+  background: #f44336; /* red = not available */
+  color: white;
+  font-weight: bold;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Toggle ON */
+.toggle-switch.on {
+  background: #4caf50; /* green = available */
+}
+
+/* Circle inside toggle */
+.switch-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.25, 1.25, 0.5, 1);
+  margin-right: 10px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Slide circle when ON */
+.toggle-switch.on .switch-circle {
+  transform: translateX(90px) scale(1.1);
+}
+
+/* Bounce animation */
+.toggle-switch .switch-circle:active {
+  transform: scale(1.2);
+}
+
+/* Label inside toggle */
+.switch-label {
+  flex: 1;
+  text-align: center;
+}
+
+/* Player count badge styling */
+.player-count {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffeb3b;
+  color: #333;
+  font-size: 10px;
+  line-height: 20px;
+  text-align: center;
   font-weight: bold;
 }
 
-button:hover {
-  opacity: 0.9;
+
+
+.availability-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  font-weight: bold;
 }
+
+.availability-btn.available { background-color: #28a745; color: white; }
+.availability-btn.not-available { background-color: #dc3545; color: white; }

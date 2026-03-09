@@ -1,109 +1,114 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { Box, Button } from "@chakra-ui/react";
 import "./matchcenter.css";
+import { getMatches, updateAvailability } from "../../api/playerApi";
 
-export default function MatchCenter() {
+export default function MatchCenter({ currentUser }) {
+  const [matches, setMatches] = useState([]);
 
-  const [matches, setMatches] = useState([
-    {
-      id: 1,
-      date: "15 Mar 2026",
-      opponent: "Royal Strikers",
-      ground: "City Cricket Ground",
-      availableCount: 8,
-      myStatus: false
-    },
-    {
-      id: 2,
-      date: "20 Mar 2026",
-      opponent: "Knight Riders",
-      ground: "Green Park",
-      availableCount: 11,
-      myStatus: true
-    }
-  ]);
-
-  const toggleAvailability = (id) => {
-    setMatches(matches.map(match => {
-
-      if (match.id === id) {
-
-        const newStatus = !match.myStatus;
-
-        let newCount = match.availableCount;
-
-        if (newStatus) newCount++;
-        else newCount--;
-
-        return {
-          ...match,
-          myStatus: newStatus,
-          availableCount: newCount
-        };
+  // Fetch all matches on mount
+  useEffect(() => {
+    async function fetchMatches() {
+      try {
+        const data = await getMatches();
+        console.log("Matches fetched:", data); // <-- Add this line
+        setMatches(data);
+      } catch (err) {
+        console.error("Failed to fetch matches:", err);
       }
+    }
+    fetchMatches();
+  }, []);
 
-      return match;
-    }));
-  };
+  // Toggle current user's availability for a match
+  const toggleAvailability = async (matchId) => {
+    if (!currentUser) {
+      alert("Please login to mark availability");
+      return;
+    }
 
-  const getRowClass = (count) => {
-    if (count >= 11) return "row-green";
-    return "row-yellow";
+    const match = matches.find((m) => m.id === matchId);
+    if (!match) return;
+
+    const newStatus = !match.myStatus;
+
+    try {
+      await updateAvailability(matchId, currentUser.id, newStatus);
+
+      // Update local state
+      setMatches(
+        matches.map((m) =>
+          m.id === matchId
+            ? {
+                ...m,
+                myStatus: newStatus,
+                availableCount: newStatus
+                  ? Math.min(m.availableCount + 1, 11)
+                  : Math.max(m.availableCount - 1, 0),
+              }
+            : m
+        )
+      );
+    } catch (err) {
+      console.error("Failed to update availability:", err);
+      alert("Could not update availability. Try again!");
+    }
   };
 
   return (
     <div className="match-center">
-
       <h2>🏏 Match Center</h2>
 
-      <table className="match-table">
+      {/* Create Match Button */}
+      <Box textAlign="right" mb={4}>
+        <Link to="/create-match">
+          <Button colorScheme="blue">+ Create New Match</Button>
+        </Link>
+      </Box>
 
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Opponent</th>
-            <th>Ground</th>
-            <th>Players Available</th>
-            <th>Your Status</th>
-          </tr>
-        </thead>
+      {/* Match Cards */}
+      <div className="match-grid">
+        {matches.map((match) => {
+          const progress = (match.availableCount / 11) * 100;
 
-        <tbody>
+          return (
+            <div
+              key={match.id}
+              className={`match-card ${
+                match.availableCount >= 11 ? "card-green" : "card-yellow"
+              }`}
+            >
+              <div className="match-header">
+                <span>{match.date}</span>
+              </div>
 
-          {matches.map(match => (
+              <h3>vs {match.opponent}</h3>
+              <p className="ground">{match.ground}</p>
 
-            <tr key={match.id} className={getRowClass(match.availableCount)}>
+              <div className="availability">
+                <span>{match.availableCount}/11 Players Available</span>
+                <div className="progress-bar">
+                  <div
+                    className="progress"
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
+              </div>
 
-              <td>{match.date}</td>
-              <td>{match.opponent}</td>
-              <td>{match.ground}</td>
-
-              <td>
-                {match.availableCount}/11
-              </td>
-
-              <td>
-
-                <button
-                  className={
-                    match.myStatus
-                      ? "btn-available"
-                      : "btn-notavailable"
-                  }
-                  onClick={() => toggleAvailability(match.id)}
-                >
-                  {match.myStatus ? "Available" : "Not Available"}
-                </button>
-
-              </td>
-
-            </tr>
-
-          ))}
-
-        </tbody>
-
-      </table>
-
+              {/* Availability Toggle Button */}
+              <button
+                className={`availability-btn ${
+                  match.myStatus ? "available" : "not-available"
+                }`}
+                onClick={() => toggleAvailability(match.id)}
+              >
+                {match.myStatus ? "Available ✅" : "Not Available ❌"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
