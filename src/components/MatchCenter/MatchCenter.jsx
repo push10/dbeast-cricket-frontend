@@ -55,29 +55,12 @@ export default function MatchCenter({ currentUser, setUser }) {
       alert("Could not update availability. Try again!");
     }
   };
-
-  const handleLogout = () => {
-
-    localStorage.removeItem("token");
-
-    setUser(null);
-
-  };
+ 
 
   return (
     <div className="match-center">
       <h2>🏏 Match Center</h2>
-
-      <Button colorScheme="red" onClick={handleLogout}>
-        Logout
-      </Button>
-
-      {/* Create Match Button */}
-      <Box textAlign="right" mb={4}>
-        <Link to="/create-match">
-          <Button colorScheme="blue">+ Create New Match</Button>
-        </Link>
-      </Box>
+ 
 
       {/* Match Cards */}
       <div className="match-grid">
