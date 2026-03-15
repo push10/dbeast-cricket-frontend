@@ -1,13 +1,13 @@
 import axios from "axios";
+import { getToken } from "./auth";
 
 const apiClient = axios.create({
   baseURL: "http://localhost:8080/api",
 });
 
-// Attach JWT token automatically
 apiClient.interceptors.request.use((config) => {
 
-  const token = localStorage.getItem("token");
+  const token = getToken();
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

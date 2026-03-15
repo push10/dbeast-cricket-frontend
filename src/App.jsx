@@ -6,6 +6,7 @@ import MatchCenter from "./components/MatchCenter/MatchCenter.jsx";
 import CreateMatch from "./components/MatchCenter/CreateMatch.jsx";
 
 function App() {
+
   const [user, setUser] = useState(() => {
 
     const token = localStorage.getItem("token");
@@ -15,21 +16,48 @@ function App() {
   });
 
   return (
+
     <Router>
+
       <Routes>
-        <Route path="/" element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />} />
-        <Route path="/login" element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />} />
-        <Route path="/register" element={<Register />} />
+
         <Route
-            path="/matches"
-            element={user ? <MatchCenter currentUser={user} /> : <Navigate to="/login" />}
-          />
+          path="/"
+          element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />}
+        />
+
         <Route
-            path="/create-match"
-            element={user ? <CreateMatch currentUser={user} /> : <Navigate to="/login" />}
-          />
+          path="/login"
+          element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />}
+        />
+
+        <Route
+          path="/register"
+          element={<Register />}
+        />
+
+        <Route
+          path="/matches"
+          element={
+            user
+              ? <MatchCenter currentUser={user} setUser={setUser} />
+              : <Navigate to="/login" />
+          }
+        />
+
+        <Route
+          path="/create-match"
+          element={
+            user
+              ? <CreateMatch currentUser={user} setUser={setUser} />
+              : <Navigate to="/login" />
+          }
+        />
+
       </Routes>
+
     </Router>
+
   );
 }
 
