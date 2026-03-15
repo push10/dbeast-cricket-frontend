@@ -4,14 +4,14 @@ import { Box, Button } from "@chakra-ui/react";
 import "./matchcenter.css";
 import { getMatches, updateAvailability } from "../../api/matchApi";
 
-export default function MatchCenter({ currentUser }) {
+export default function MatchCenter({ currentUser, setUser }) {
   const [matches, setMatches] = useState([]);
 
   // Fetch all matches on mount
   useEffect(() => {
     async function fetchMatches() {
       try {
-        const data = await getMatches();
+        const data = await getMatches(currentUser.id);
         console.log("Matches fetched:", data); // <-- Add this line
         setMatches(data);
       } catch (err) {
@@ -55,17 +55,12 @@ export default function MatchCenter({ currentUser }) {
       alert("Could not update availability. Try again!");
     }
   };
+ 
 
   return (
     <div className="match-center">
       <h2>🏏 Match Center</h2>
-
-      {/* Create Match Button */}
-      <Box textAlign="right" mb={4}>
-        <Link to="/create-match">
-          <Button colorScheme="blue">+ Create New Match</Button>
-        </Link>
-      </Box>
+ 
 
       {/* Match Cards */}
       <div className="match-grid">
