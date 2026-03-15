@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import React, { useState } from "react";
 import Login from "./components/Login.jsx";
 import Register from "./components/Register.jsx";
-import MatchCenter from "./components/MatchCenter.jsx";
+import MatchCenter from "./components/MatchCenter/MatchCenter.jsx";
+import CreateMatch from "./components/MatchCenter/CreateMatch.jsx";
 
 function App() {
   const [user, setUser] = useState(() => {
@@ -19,7 +20,14 @@ function App() {
         <Route path="/" element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />} />
         <Route path="/login" element={user ? <Navigate to="/matches" /> : <Login onLoginSuccess={setUser} />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/matches" element={user ? <MatchCenter /> : <Navigate to="/login" />} />
+        <Route
+            path="/matches"
+            element={user ? <MatchCenter currentUser={user} /> : <Navigate to="/login" />}
+          />
+        <Route
+            path="/create-match"
+            element={user ? <CreateMatch currentUser={user} /> : <Navigate to="/login" />}
+          />
       </Routes>
     </Router>
   );

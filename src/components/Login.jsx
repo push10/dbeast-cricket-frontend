@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Input, Button, VStack, Heading } from "@chakra-ui/react";
 import { useNavigate, Link } from "react-router-dom";
-import { sendOtp, loginPlayer } from "../api/playerApi";
+import { sendOtp, loginPlayer } from "../api/authApi";
 
 export default function Login({ onLoginSuccess }) {
 
