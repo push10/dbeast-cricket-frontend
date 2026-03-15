@@ -1,8 +1,10 @@
 import apiClient from "./apiClient";
 
 // Get all matches
-export const getMatches = async () => {
-  const res = await apiClient.get("/matches");
+export const getMatches = async (playerId) => {
+  const res = await apiClient.get("/matches", {
+    params: { playerId }
+  });
   return res.data;
 };
 

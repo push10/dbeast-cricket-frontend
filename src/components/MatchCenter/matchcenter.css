@@ -171,3 +171,28 @@
 
 .availability-btn.available { background-color: #28a745; color: white; }
 .availability-btn.not-available { background-color: #dc3545; color: white; }
+
+.toggle-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 25px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.toggle-btn.on {
+  background: #22c55e;
+  color: white;
+}
+
+.toggle-btn.off {
+  background: #ef4444;
+  color: white;
+}
+
+.toggle-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
