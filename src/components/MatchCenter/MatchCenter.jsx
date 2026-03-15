@@ -5,40 +5,61 @@ import "./matchcenter.css";
 import { getMatches, updateAvailability } from "../../api/matchApi";
 
 export default function MatchCenter({ currentUser }) {
-  const [matches, setMatches] = useState([]);
 
-  // Fetch all matches on mount
+  const [matches, setMatches] = useState([]);
+  const [loadingMatchId, setLoadingMatchId] = useState(null);
+
+  // Fetch matches
   useEffect(() => {
+
     async function fetchMatches() {
+
+      if (!currentUser) return;
+
       try {
-        const data = await getMatches();
-        console.log("Matches fetched:", data); // <-- Add this line
+
+        const data = await getMatches(currentUser.id);
+        console.log("Matches fetched:", data);
+
         setMatches(data);
+
       } catch (err) {
+
         console.error("Failed to fetch matches:", err);
+
       }
     }
-    fetchMatches();
-  }, []);
 
-  // Toggle current user's availability for a match
+    fetchMatches();
+
+  }, [currentUser]);
+
+
+
+  // Toggle availability
   const toggleAvailability = async (matchId) => {
+
     if (!currentUser) {
+
       alert("Please login to mark availability");
       return;
+
     }
 
     const match = matches.find((m) => m.id === matchId);
+
     if (!match) return;
 
     const newStatus = !match.myStatus;
 
     try {
+
+      setLoadingMatchId(matchId);
+
       await updateAvailability(matchId, currentUser.id, newStatus);
 
-      // Update local state
-      setMatches(
-        matches.map((m) =>
+      setMatches((prevMatches) =>
+        prevMatches.map((m) =>
           m.id === matchId
             ? {
                 ...m,
@@ -50,65 +71,106 @@ export default function MatchCenter({ currentUser }) {
             : m
         )
       );
+
     } catch (err) {
+
       console.error("Failed to update availability:", err);
       alert("Could not update availability. Try again!");
+
+    } finally {
+
+      setLoadingMatchId(null);
+
     }
   };
 
+
+
   return (
     <div className="match-center">
+
       <h2>🏏 Match Center</h2>
 
       {/* Create Match Button */}
       <Box textAlign="right" mb={4}>
         <Link to="/create-match">
-          <Button colorScheme="blue">+ Create New Match</Button>
+          <Button colorScheme="blue">
+            + Create New Match
+          </Button>
         </Link>
       </Box>
 
+
       {/* Match Cards */}
       <div className="match-grid">
+
         {matches.map((match) => {
+
           const progress = (match.availableCount / 11) * 100;
 
           return (
+
             <div
               key={match.id}
               className={`match-card ${
-                match.availableCount >= 11 ? "card-green" : "card-yellow"
+                match.availableCount >= 11
+                  ? "card-green"
+                  : "card-yellow"
               }`}
             >
+
               <div className="match-header">
-                <span>{match.date}</span>
+                <span>{match.matchDate}</span>
               </div>
 
-              <h3>vs {match.opponent}</h3>
-              <p className="ground">{match.ground}</p>
+              <h3>
+                {match.teamA} vs {match.teamB}
+              </h3>
+
 
               <div className="availability">
-                <span>{match.availableCount}/11 Players Available</span>
+
+                <span>
+                  {match.availableCount}/11 Players Available
+                </span>
+
                 <div className="progress-bar">
+
                   <div
                     className="progress"
                     style={{ width: `${progress}%` }}
                   ></div>
+
                 </div>
+
               </div>
 
-              {/* Availability Toggle Button */}
+
+              {/* Toggle Availability Button */}
               <button
-                className={`availability-btn ${
-                  match.myStatus ? "available" : "not-available"
+                disabled={loadingMatchId === match.id}
+                className={`toggle-btn ${
+                  match.myStatus ? "on" : "off"
                 }`}
                 onClick={() => toggleAvailability(match.id)}
               >
-                {match.myStatus ? "Available ✅" : "Not Available ❌"}
+
+                {loadingMatchId === match.id
+                  ? "Updating..."
+                  : match.myStatus
+                  ? "Available ✅"
+                  : "Not Available ❌"}
+
               </button>
+
             </div>
+
           );
+
         })}
+
       </div>
+
     </div>
   );
 }
