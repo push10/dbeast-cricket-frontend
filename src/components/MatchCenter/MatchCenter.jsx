@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Box, Button } from "@chakra-ui/react";
 import "./matchcenter.css";
-import { getMatches, updateAvailability } from "../../api/playerApi";
+import { getMatches, updateAvailability } from "../../api/matchApi";
 
 export default function MatchCenter({ currentUser }) {
   const [matches, setMatches] = useState([]);

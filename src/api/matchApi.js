@@ -6,20 +6,19 @@ export const getMatches = async () => {
   return res.data;
 };
 
-// Create a new match
+// Create new match
 export const createMatch = async (match) => {
   const res = await apiClient.post("/matches", match);
   return res.data;
 };
 
-// Update availability
+// Update player availability
 export const updateAvailability = async (matchId, playerId, available) => {
-  // Send available status and playerId as query params, not body
   const res = await apiClient.post(
     `/matches/${matchId}/availability`,
-    null, // no body
+    null,
     {
-      params: { playerId, available },
+      params: { playerId, available }
     }
   );
 

@@ -17,7 +17,12 @@ export default function CreateMatch({ currentUser }) {
     }
 
     try {
-      await createMatch({ opponent, ground, date });
+      await createMatch({
+        teamA: "Our Team",
+        teamB: opponent,
+        matchDate: date,
+        ground: ground
+      });
       alert("Match created successfully!");
       navigate("/matches");
     } catch (err) {

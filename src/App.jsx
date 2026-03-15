@@ -24,7 +24,10 @@ function App() {
             path="/matches"
             element={user ? <MatchCenter currentUser={user} /> : <Navigate to="/login" />}
           />
-        <Route path="/create-match" element={<CreateMatch currentUser={user} />} />
+        <Route
+            path="/create-match"
+            element={user ? <CreateMatch currentUser={user} /> : <Navigate to="/login" />}
+          />
       </Routes>
     </Router>
   );

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Input, Button, VStack, Heading } from "@chakra-ui/react";
 import { useNavigate } from "react-router-dom";
-import { registerPlayer } from "../api/playerApi";
+import { registerPlayer } from "../api/authApi";
 
 export default function Register() {
 
