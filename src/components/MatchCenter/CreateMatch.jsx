@@ -1,28 +1,31 @@
-// src/components/MatchCenter/CreateMatch.jsx
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Input, Button, VStack, Heading } from "@chakra-ui/react";
+import { Box, Input, Button, VStack, Heading, Text } from "@chakra-ui/react";
 import { createMatch } from "../../api/matchApi";
 
 export default function CreateMatch({ currentUser }) {
   const [opponent, setOpponent] = useState("");
-  const [ground, setGround] = useState("");
   const [date, setDate] = useState("");
   const navigate = useNavigate();
 
+  const myTeamName = useMemo(() => {
+    const captainTeam = currentUser?.teams?.find((team) => team.role === "CAPTAIN");
+    return captainTeam?.teamName || currentUser?.teams?.[0]?.teamName || "My Team";
+  }, [currentUser]);
+
   const handleCreate = async () => {
-    if (!opponent || !ground || !date) {
+    if (!opponent || !date) {
       alert("Please fill all fields");
       return;
     }
 
     try {
       await createMatch({
-        teamA: "Our Team",
-        teamB: opponent,
+        teamA: myTeamName,
+        teamB: opponent.trim(),
         matchDate: date,
-        ground: ground
       });
+
       alert("Match created successfully!");
       navigate("/matches");
     } catch (err) {
@@ -35,22 +38,27 @@ export default function CreateMatch({ currentUser }) {
     <Box maxW="md" mx="auto" mt={10} p={6} borderWidth={1} borderRadius="md">
       <VStack spacing={4}>
         <Heading size="md">Create New Match</Heading>
+
+        <Box width="full" p={3} bg="gray.50" borderRadius="md">
+          <Text fontSize="sm" color="gray.500">
+            Team Creating Match
+          </Text>
+          <Text fontWeight="semibold">{myTeamName}</Text>
+        </Box>
+
         <Input
           type="date"
           placeholder="Match Date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
         />
+
         <Input
           placeholder="Opponent Team"
           value={opponent}
           onChange={(e) => setOpponent(e.target.value)}
         />
-        <Input
-          placeholder="Ground"
-          value={ground}
-          onChange={(e) => setGround(e.target.value)}
-        />
+
         <Button colorScheme="blue" width="full" onClick={handleCreate}>
           Create Match
         </Button>

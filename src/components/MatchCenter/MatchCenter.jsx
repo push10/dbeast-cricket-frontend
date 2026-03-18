@@ -1,53 +1,68 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Box, Button } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import "./matchcenter.css";
 import { getMatches, updateAvailability } from "../../api/matchApi";
 
-export default function MatchCenter({ currentUser, setUser }) {
+const MAX_PLAYERS = 11;
+
+function formatMatchDate(matchDate) {
+  if (!matchDate) {
+    return "Date not set";
+  }
+
+  return new Date(matchDate).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export default function MatchCenter({ currentUser }) {
   const [matches, setMatches] = useState([]);
 
-  // Fetch all matches on mount
   useEffect(() => {
     async function fetchMatches() {
+      if (!currentUser?.id) {
+        return;
+      }
+
       try {
         const data = await getMatches(currentUser.id);
-        console.log("Matches fetched:", data); // <-- Add this line
         setMatches(data);
       } catch (err) {
         console.error("Failed to fetch matches:", err);
       }
     }
-    fetchMatches();
-  }, []);
 
-  // Toggle current user's availability for a match
+    fetchMatches();
+  }, [currentUser?.id]);
+
   const toggleAvailability = async (matchId) => {
-    if (!currentUser) {
+    if (!currentUser?.id) {
       alert("Please login to mark availability");
       return;
     }
 
-    const match = matches.find((m) => m.id === matchId);
-    if (!match) return;
+    const match = matches.find((item) => item.id === matchId);
+    if (!match) {
+      return;
+    }
 
     const newStatus = !match.myStatus;
 
     try {
       await updateAvailability(matchId, currentUser.id, newStatus);
 
-      // Update local state
-      setMatches(
-        matches.map((m) =>
-          m.id === matchId
+      setMatches((prevMatches) =>
+        prevMatches.map((item) =>
+          item.id === matchId
             ? {
-                ...m,
+                ...item,
                 myStatus: newStatus,
                 availableCount: newStatus
-                  ? Math.min(m.availableCount + 1, 11)
-                  : Math.max(m.availableCount - 1, 0),
+                  ? Math.min(item.availableCount + 1, MAX_PLAYERS)
+                  : Math.max(item.availableCount - 1, 0),
               }
-            : m
+            : item
         )
       );
     } catch (err) {
@@ -55,50 +70,44 @@ export default function MatchCenter({ currentUser, setUser }) {
       alert("Could not update availability. Try again!");
     }
   };
- 
 
   return (
     <div className="match-center">
-      <h2>🏏 Match Center</h2>
- 
+      <h2>Match Center</h2>
 
-      {/* Match Cards */}
       <div className="match-grid">
         {matches.map((match) => {
-          const progress = (match.availableCount / 11) * 100;
+          const progress = (match.availableCount / MAX_PLAYERS) * 100;
 
           return (
             <div
               key={match.id}
               className={`match-card ${
-                match.availableCount >= 11 ? "card-green" : "card-yellow"
+                match.availableCount >= MAX_PLAYERS ? "card-green" : "card-yellow"
               }`}
             >
-              <div className="match-header">
-                <span>{match.date}</span>
-              </div>
+              <div className="match-header">{formatMatchDate(match.matchDate)}</div>
 
-              <h3>vs {match.opponent}</h3>
-              <p className="ground">{match.ground}</p>
+              <h3>
+                {match.teamA} vs {match.teamB}
+              </h3>
+
+              <p className="ground">Availability for this match</p>
 
               <div className="availability">
-                <span>{match.availableCount}/11 Players Available</span>
+                <span>
+                  {match.availableCount}/{MAX_PLAYERS} Players Available
+                </span>
                 <div className="progress-bar">
-                  <div
-                    className="progress"
-                    style={{ width: `${progress}%` }}
-                  ></div>
+                  <div className="progress" style={{ width: `${progress}%` }}></div>
                 </div>
               </div>
 
-              {/* Availability Toggle Button */}
               <button
-                className={`availability-btn ${
-                  match.myStatus ? "available" : "not-available"
-                }`}
+                className={`availability-btn ${match.myStatus ? "available" : "not-available"}`}
                 onClick={() => toggleAvailability(match.id)}
               >
-                {match.myStatus ? "Available ✅" : "Not Available ❌"}
+                {match.myStatus ? "Available" : "Not Available"}
               </button>
             </div>
           );
