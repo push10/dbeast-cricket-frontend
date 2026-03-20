@@ -33,6 +33,9 @@ export default function Header({ user, setUser }) {
           <Button as={RouterLink} to="/matches" variant="ghost" color="white">
             Matches
           </Button>
+          <Button as={RouterLink} to="/ledger" variant="ghost" color="white">
+            Ledger
+          </Button>
           <Button as={RouterLink} to="/create-match" variant="ghost" color="white">
             Create Match
           </Button>
@@ -61,6 +64,9 @@ export default function Header({ user, setUser }) {
             </MenuItem>
             <MenuItem as={RouterLink} to="/teams">
               Teams
+            </MenuItem>
+            <MenuItem as={RouterLink} to="/ledger">
+              Ledger
             </MenuItem>
             <MenuItem onClick={handleLogout}>
               Logout

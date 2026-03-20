@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "./matchcenter.css";
-import { getMatches, getNextMatchSquad, updateAvailability } from "../../api/matchApi";
+import { completeMatch, getMatches, getNextMatchSquad, updateAvailability } from "../../api/matchApi";
 import { getApiErrorMessage } from "../../utils/apiErrors";
 
 const MAX_PLAYERS = 11;
@@ -21,6 +21,7 @@ export default function MatchCenter({ currentUser }) {
   const [matches, setMatches] = useState([]);
   const [nextSquad, setNextSquad] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [completingMatchId, setCompletingMatchId] = useState(null);
 
   const isCaptain = currentUser?.userRole === "CAPTAIN";
   const hasTeamMembership = Boolean(currentUser?.teams?.length);
@@ -33,42 +34,63 @@ export default function MatchCenter({ currentUser }) {
     [matches]
   );
 
-  useEffect(() => {
-    async function loadHomeData() {
-      if (!currentUser?.id) {
+  const loadHomeData = async () => {
+    if (!currentUser?.id) {
+      return;
+    }
+
+    try {
+      const matchesData = await getMatches(currentUser.id);
+
+      setMatches(matchesData);
+      setErrorMessage("");
+
+      if (!hasTeamMembership) {
+        setNextSquad(null);
         return;
       }
 
       try {
-        const matchesData = await getMatches(currentUser.id);
-
-        setMatches(matchesData);
-        setErrorMessage("");
-
-        if (!hasTeamMembership) {
+        const squadData = await getNextMatchSquad();
+        setNextSquad(squadData);
+      } catch (err) {
+        if (err?.response?.status === 404) {
           setNextSquad(null);
           return;
         }
 
-        try {
-          const squadData = await getNextMatchSquad();
-          setNextSquad(squadData);
-        } catch (err) {
-          if (err?.response?.status === 404) {
-            setNextSquad(null);
-            return;
-          }
-
-          throw err;
-        }
-      } catch (err) {
-        console.error("Failed to fetch match center data:", err);
-        setErrorMessage(getApiErrorMessage(err, "Could not load match center"));
+        throw err;
       }
+    } catch (err) {
+      console.error("Failed to fetch match center data:", err);
+      setErrorMessage(getApiErrorMessage(err, "Could not load match center"));
     }
+  };
 
+  useEffect(() => {
     loadHomeData();
   }, [currentUser?.id, hasTeamMembership]);
+
+  const canCaptainManageMatch = (match) =>
+    (currentUser?.teams || []).some(
+      (team) =>
+        team.role === "CAPTAIN" &&
+        (team.teamName === match.teamA || team.teamName === match.teamB)
+    );
+
+  const isMatchOnOrBeforeToday = (matchDate) => {
+    if (!matchDate) {
+      return false;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const fixtureDate = new Date(matchDate);
+    fixtureDate.setHours(0, 0, 0, 0);
+
+    return fixtureDate.getTime() <= today.getTime();
+  };
 
   const syncMatchAvailability = (matchId, playerId, available) => {
     setMatches((prevMatches) =>
@@ -155,6 +177,21 @@ export default function MatchCenter({ currentUser }) {
     }
   };
 
+  const handleMarkCompleted = async (matchId) => {
+    setCompletingMatchId(matchId);
+
+    try {
+      await completeMatch(matchId);
+      await loadHomeData();
+      setErrorMessage("");
+    } catch (err) {
+      console.error("Failed to mark match completed:", err);
+      setErrorMessage(getApiErrorMessage(err, "Could not mark match completed"));
+    } finally {
+      setCompletingMatchId(null);
+    }
+  };
+
   return (
     <div className="match-center">
       <section>
@@ -199,6 +236,16 @@ export default function MatchCenter({ currentUser }) {
                       : "Make Unavailable"
                     : "Mark Available"}
                 </button>
+
+                {isCaptain && canCaptainManageMatch(match) && isMatchOnOrBeforeToday(match.matchDate) && (
+                  <button
+                    className="availability-btn"
+                    onClick={() => handleMarkCompleted(match.id)}
+                    disabled={completingMatchId === match.id}
+                  >
+                    {completingMatchId === match.id ? "Marking Completed..." : "Mark Completed"}
+                  </button>
+                )}
               </article>
             );
           })}

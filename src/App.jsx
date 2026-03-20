@@ -7,6 +7,7 @@ import MatchCenter from "./components/MatchCenter/MatchCenter.jsx";
 import CreateMatch from "./components/MatchCenter/CreateMatch.jsx";
 import Profile from "./components/Profile.jsx";
 import Teams from "./components/Teams.jsx";
+import MatchLedger from "./components/MatchLedger.jsx";
 import Layout from "./components/layout/Layout";
 import { getCurrentUser, getToken, clearAuth, setCurrentUser } from "./api/auth";
 import { getMyProfile } from "./api/authApi";
@@ -99,6 +100,14 @@ function App() {
           element={
             <ProtectedLayout user={user} setUser={setUser}>
               <Teams currentUser={user} setUser={setUser} />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/ledger"
+          element={
+            <ProtectedLayout user={user} setUser={setUser}>
+              <MatchLedger currentUser={user} />
             </ProtectedLayout>
           }
         />

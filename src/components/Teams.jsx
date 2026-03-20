@@ -14,15 +14,15 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
-import { addPlayerToTeam, createTeam, getTeam } from "../api/teamApi";
+import { addPlayerToTeam, createTeam, getAvailablePlayersForTeam, getTeam } from "../api/teamApi";
 import { getMyProfile } from "../api/authApi";
 import { setCurrentUser } from "../api/auth";
-import { isValidMobile } from "../utils/validation";
 import { getApiFieldErrors, getApiErrorMessage } from "../utils/apiErrors";
 
 export default function Teams({ currentUser, setUser }) {
   const [teamName, setTeamName] = useState("");
-  const [playerMobile, setPlayerMobile] = useState("");
+  const [selectedPlayerMobile, setSelectedPlayerMobile] = useState("");
+  const [availablePlayers, setAvailablePlayers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [activeTeam, setActiveTeam] = useState(null);
   const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState("");
@@ -55,14 +55,28 @@ export default function Teams({ currentUser, setUser }) {
 
       if (profile.teams?.length) {
         const captainMemberships = profile.teams.filter((team) => team.role === "CAPTAIN");
-        const initialCaptainTeamId = captainMemberships[0]?.teamId;
-        setSelectedCaptainTeamId(initialCaptainTeamId ? String(initialCaptainTeamId) : "");
+        const preservedCaptainTeamId = captainMemberships.some(
+          (team) => String(team.teamId) === selectedCaptainTeamId
+        )
+          ? selectedCaptainTeamId
+          : captainMemberships[0]?.teamId
+            ? String(captainMemberships[0].teamId)
+            : "";
+        setSelectedCaptainTeamId(preservedCaptainTeamId);
 
-        const initialTeam = initialCaptainTeamId || profile.teams[0].teamId;
+        const initialTeam = preservedCaptainTeamId || String(profile.teams[0].teamId);
         await loadTeam(initialTeam);
+        if (preservedCaptainTeamId) {
+          await loadAvailablePlayers(preservedCaptainTeamId);
+        } else {
+          setAvailablePlayers([]);
+          setSelectedPlayerMobile("");
+        }
       } else {
         setSelectedCaptainTeamId("");
         setActiveTeam(null);
+        setAvailablePlayers([]);
+        setSelectedPlayerMobile("");
       }
     } catch (err) {
       console.error("Failed to load teams", err);
@@ -75,6 +89,20 @@ export default function Teams({ currentUser, setUser }) {
       setActiveTeam(data);
     } catch (err) {
       console.error("Failed to load team details", err);
+    }
+  };
+
+  const loadAvailablePlayers = async (teamId) => {
+    try {
+      const players = await getAvailablePlayersForTeam(teamId);
+      setAvailablePlayers(players);
+      setSelectedPlayerMobile((currentMobile) =>
+        players.some((player) => player.mobile === currentMobile) ? currentMobile : ""
+      );
+    } catch (err) {
+      console.error("Failed to load available players", err);
+      setAvailablePlayers([]);
+      setSelectedPlayerMobile("");
     }
   };
 
@@ -113,27 +141,21 @@ export default function Teams({ currentUser, setUser }) {
       return;
     }
 
-    const trimmedMobile = playerMobile.trim();
-    const nextErrors = {};
-
     setAddPlayerError("");
 
-    if (!isValidMobile(trimmedMobile)) {
-      nextErrors.mobile = "Enter a valid 10-digit Indian mobile number";
-    }
-
-    if (Object.keys(nextErrors).length > 0) {
-      setAddPlayerErrors(nextErrors);
+    if (!selectedPlayerMobile) {
+      setAddPlayerErrors({ mobile: "Select a player to add" });
       return;
     }
 
     setAddPlayerErrors({});
 
     try {
-      const updatedTeam = await addPlayerToTeam(selectedCaptainTeam.teamId, trimmedMobile);
-      setPlayerMobile("");
+      const updatedTeam = await addPlayerToTeam(selectedCaptainTeam.teamId, selectedPlayerMobile);
+      setSelectedPlayerMobile("");
       setActiveTeam(updatedTeam);
       await refreshProfileTeams();
+      await loadAvailablePlayers(selectedCaptainTeam.teamId);
     } catch (err) {
       console.error("Failed to add player", err);
       setAddPlayerErrors(getApiFieldErrors(err));
@@ -146,7 +168,7 @@ export default function Teams({ currentUser, setUser }) {
       <Box>
         <Heading size="lg">Teams</Heading>
         <Text color="gray.600">
-          Captains can create a team and add registered players by mobile number.
+          Captains can create a team and add registered players from an available list.
         </Text>
       </Box>
 
@@ -194,7 +216,17 @@ export default function Teams({ currentUser, setUser }) {
               <Select
                 placeholder={captainTeams.length ? "Choose a team" : "No captain team available"}
                 value={selectedCaptainTeamId}
-                onChange={(e) => setSelectedCaptainTeamId(e.target.value)}
+                onChange={(e) => {
+                  const teamId = e.target.value;
+                  setSelectedCaptainTeamId(teamId);
+                  if (teamId) {
+                    loadTeam(teamId);
+                    loadAvailablePlayers(teamId);
+                  } else {
+                    setAvailablePlayers([]);
+                    setSelectedPlayerMobile("");
+                  }
+                }}
                 isDisabled={!captainTeams.length}
               >
                 {captainTeams.map((team) => (
@@ -205,20 +237,38 @@ export default function Teams({ currentUser, setUser }) {
               </Select>
             </FormControl>
 
-            <FormControl isInvalid={Boolean(addPlayerErrors.mobile)}>
-              <FormLabel>Player Mobile Number</FormLabel>
-              <Input
-                value={playerMobile}
-                maxLength={10}
+            <FormControl>
+              <FormLabel>Available Players</FormLabel>
+              <Select
+                placeholder={
+                  !selectedCaptainTeam
+                    ? "Select a team first"
+                    : availablePlayers.length
+                      ? "Choose a registered player"
+                      : "No available players"
+                }
+                value={selectedPlayerMobile}
                 onChange={(e) => {
-                  setPlayerMobile(e.target.value);
+                  setSelectedPlayerMobile(e.target.value);
                   setAddPlayerErrors((prev) => ({ ...prev, mobile: undefined }));
                 }}
-              />
-              <FormErrorMessage>{addPlayerErrors.mobile}</FormErrorMessage>
+                isDisabled={!selectedCaptainTeam || !availablePlayers.length}
+              >
+                {availablePlayers.map((player) => (
+                  <option key={player.id} value={player.mobile}>
+                    {player.name || player.mobile} - {player.mobile}
+                  </option>
+                ))}
+              </Select>
             </FormControl>
 
-            <Button colorScheme="green" onClick={handleAddPlayer} isDisabled={!selectedCaptainTeam}>
+            {addPlayerErrors.mobile && (
+              <Text fontSize="sm" color="red.500">
+                {addPlayerErrors.mobile}
+              </Text>
+            )}
+
+            <Button colorScheme="green" onClick={handleAddPlayer} isDisabled={!selectedCaptainTeam || !selectedPlayerMobile}>
               Add Player
             </Button>
 
