@@ -9,6 +9,7 @@ import {
   FormLabel,
   Heading,
   Input,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -24,14 +25,20 @@ export default function Teams({ currentUser, setUser }) {
   const [playerMobile, setPlayerMobile] = useState("");
   const [teams, setTeams] = useState([]);
   const [activeTeam, setActiveTeam] = useState(null);
+  const [selectedCaptainTeamId, setSelectedCaptainTeamId] = useState("");
   const [createTeamErrors, setCreateTeamErrors] = useState({});
   const [createTeamError, setCreateTeamError] = useState("");
   const [addPlayerErrors, setAddPlayerErrors] = useState({});
   const [addPlayerError, setAddPlayerError] = useState("");
 
-  const captainTeam = useMemo(
-    () => teams.find((team) => team.role === "CAPTAIN") || null,
+  const captainTeams = useMemo(
+    () => teams.filter((team) => team.role === "CAPTAIN"),
     [teams]
+  );
+
+  const selectedCaptainTeam = useMemo(
+    () => captainTeams.find((team) => String(team.teamId) === selectedCaptainTeamId) || null,
+    [captainTeams, selectedCaptainTeamId]
   );
 
   useEffect(() => {
@@ -47,10 +54,14 @@ export default function Teams({ currentUser, setUser }) {
       setUser(nextUser);
 
       if (profile.teams?.length) {
-        const captainMembership = profile.teams.find((team) => team.role === "CAPTAIN");
-        const initialTeam = captainMembership?.teamId || profile.teams[0].teamId;
+        const captainMemberships = profile.teams.filter((team) => team.role === "CAPTAIN");
+        const initialCaptainTeamId = captainMemberships[0]?.teamId;
+        setSelectedCaptainTeamId(initialCaptainTeamId ? String(initialCaptainTeamId) : "");
+
+        const initialTeam = initialCaptainTeamId || profile.teams[0].teamId;
         await loadTeam(initialTeam);
       } else {
+        setSelectedCaptainTeamId("");
         setActiveTeam(null);
       }
     } catch (err) {
@@ -97,7 +108,7 @@ export default function Teams({ currentUser, setUser }) {
   };
 
   const handleAddPlayer = async () => {
-    if (!captainTeam) {
+    if (!selectedCaptainTeam) {
       setAddPlayerError("Create a team first");
       return;
     }
@@ -119,7 +130,7 @@ export default function Teams({ currentUser, setUser }) {
     setAddPlayerErrors({});
 
     try {
-      const updatedTeam = await addPlayerToTeam(captainTeam.teamId, trimmedMobile);
+      const updatedTeam = await addPlayerToTeam(selectedCaptainTeam.teamId, trimmedMobile);
       setPlayerMobile("");
       setActiveTeam(updatedTeam);
       await refreshProfileTeams();
@@ -169,7 +180,7 @@ export default function Teams({ currentUser, setUser }) {
         </Box>
 
         <Box borderWidth={1} borderRadius="lg" p={6}>
-          <Heading size="md" mb={4}>Add Player To My Team</Heading>
+          <Heading size="md" mb={4}>Add Player To Team</Heading>
           <Stack spacing={4}>
             {addPlayerError && (
               <Alert status="error" borderRadius="md">
@@ -177,6 +188,22 @@ export default function Teams({ currentUser, setUser }) {
                 {addPlayerError}
               </Alert>
             )}
+
+            <FormControl>
+              <FormLabel>Select Team</FormLabel>
+              <Select
+                placeholder={captainTeams.length ? "Choose a team" : "No captain team available"}
+                value={selectedCaptainTeamId}
+                onChange={(e) => setSelectedCaptainTeamId(e.target.value)}
+                isDisabled={!captainTeams.length}
+              >
+                {captainTeams.map((team) => (
+                  <option key={team.teamId} value={team.teamId}>
+                    {team.teamName}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
 
             <FormControl isInvalid={Boolean(addPlayerErrors.mobile)}>
               <FormLabel>Player Mobile Number</FormLabel>
@@ -191,11 +218,11 @@ export default function Teams({ currentUser, setUser }) {
               <FormErrorMessage>{addPlayerErrors.mobile}</FormErrorMessage>
             </FormControl>
 
-            <Button colorScheme="green" onClick={handleAddPlayer} isDisabled={!captainTeam}>
+            <Button colorScheme="green" onClick={handleAddPlayer} isDisabled={!selectedCaptainTeam}>
               Add Player
             </Button>
 
-            {!captainTeam && (
+            {!captainTeams.length && (
               <Text fontSize="sm" color="gray.500">
                 You become captain after creating a team.
               </Text>
