@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   AlertIcon,
+  Badge,
   Box,
   Button,
   FormControl,
@@ -15,8 +16,15 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
-import { getMyProfile, updateMyProfile } from "../api/authApi";
+import {
+  approveWalletRechargeRequest,
+  createWalletRechargeRequest,
+  getMyProfile,
+  getMyWalletRechargeRequests,
+  updateMyProfile,
+} from "../api/authApi";
 import { setCurrentUser } from "../api/auth";
+import { getTeam } from "../api/teamApi";
 import { isValidEmail, isValidHttpUrl } from "../utils/validation";
 import { getApiFieldErrors, getApiErrorMessage } from "../utils/apiErrors";
 
@@ -29,26 +37,110 @@ const EMPTY_FORM = {
   playerRole: "",
 };
 
+const EMPTY_RECHARGE_FORM = {
+  amount: "",
+  description: "",
+};
+
+const EMPTY_DEMAND_FORM = {
+  playerId: "",
+  amount: "",
+  description: "",
+};
+
+const formatCurrency = (value) => `Rs. ${Number(value || 0).toFixed(2)}`;
+
+const formatDate = (value) =>
+  value
+    ? new Date(value).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : "Pending";
+
 export default function Profile({ currentUser, setUser }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [wallet, setWallet] = useState(null);
   const [teams, setTeams] = useState([]);
+  const [rechargeRequests, setRechargeRequests] = useState([]);
+  const [captainPlayers, setCaptainPlayers] = useState([]);
+  const [rechargeForm, setRechargeForm] = useState(EMPTY_RECHARGE_FORM);
+  const [demandForm, setDemandForm] = useState(EMPTY_DEMAND_FORM);
   const [saving, setSaving] = useState(false);
+  const [savingRecharge, setSavingRecharge] = useState(false);
+  const [savingDemand, setSavingDemand] = useState(false);
+  const [approvingRequestId, setApprovingRequestId] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState("");
 
+  const isCaptain = currentUser?.userRole === "CAPTAIN";
+
+  const captainTeamMemberships = useMemo(
+    () => teams.filter((team) => team.role === "CAPTAIN"),
+    [teams]
+  );
+
   useEffect(() => {
-    async function loadProfile() {
+    loadProfileData();
+  }, []);
+
+  useEffect(() => {
+    async function loadCaptainPlayers() {
+      if (!captainTeamMemberships.length) {
+        setCaptainPlayers([]);
+        return;
+      }
+
       try {
-        const profile = await getMyProfile();
-        syncProfile(profile);
+        const teamResponses = await Promise.all(
+          captainTeamMemberships.map((team) => getTeam(team.teamId))
+        );
+
+        const mappedPlayers = [];
+        teamResponses.forEach((teamResponse) => {
+          (teamResponse.players || []).forEach((player) => {
+            mappedPlayers.push({
+              id: player.id,
+              name: player.name || player.mobile,
+              mobile: player.mobile,
+              teamName: teamResponse.teamName,
+            });
+          });
+        });
+
+        const uniquePlayers = mappedPlayers.filter(
+          (player, index, array) => array.findIndex((item) => item.id === player.id) === index
+        );
+
+        setCaptainPlayers(uniquePlayers);
+        setDemandForm((prev) => ({
+          ...prev,
+          playerId: prev.playerId || String(uniquePlayers[0]?.id || ""),
+        }));
       } catch (err) {
-        console.error("Failed to load profile", err);
+        console.error("Failed to load captain team players", err);
       }
     }
 
-    loadProfile();
-  }, []);
+    loadCaptainPlayers();
+  }, [captainTeamMemberships]);
+
+  const loadProfileData = async () => {
+    try {
+      const [profile, requests] = await Promise.all([getMyProfile(), getMyWalletRechargeRequests()]);
+      syncProfile(profile);
+      setRechargeRequests(requests);
+    } catch (err) {
+      console.error("Failed to load profile", err);
+    }
+  };
+
+  const refreshWalletData = async () => {
+    const [profile, requests] = await Promise.all([getMyProfile(), getMyWalletRechargeRequests()]);
+    syncProfile(profile);
+    setRechargeRequests(requests);
+  };
 
   const syncProfile = (profile) => {
     setForm({
@@ -74,6 +166,16 @@ export default function Profile({ currentUser, setUser }) {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     clearFieldError(name);
+  };
+
+  const handleRechargeFormChange = (event) => {
+    const { name, value } = event.target;
+    setRechargeForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleDemandFormChange = (event) => {
+    const { name, value } = event.target;
+    setDemandForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
@@ -130,12 +232,80 @@ export default function Profile({ currentUser, setUser }) {
     }
   };
 
+  const handleCreateRechargeRequest = async () => {
+    if (!rechargeForm.amount) {
+      setFormError("Recharge amount is required");
+      return;
+    }
+
+    setSavingRecharge(true);
+    setFormError("");
+
+    try {
+      await createWalletRechargeRequest({
+        amount: Number(rechargeForm.amount),
+        description: rechargeForm.description.trim() || null,
+      });
+      setRechargeForm(EMPTY_RECHARGE_FORM);
+      await refreshWalletData();
+    } catch (err) {
+      console.error("Failed to create recharge request", err);
+      setFormError(getApiErrorMessage(err, "Could not submit recharge request"));
+    } finally {
+      setSavingRecharge(false);
+    }
+  };
+
+  const handleCreateDemand = async () => {
+    if (!demandForm.playerId || !demandForm.amount) {
+      setFormError("Player and amount are required for a recharge demand");
+      return;
+    }
+
+    setSavingDemand(true);
+    setFormError("");
+
+    try {
+      await createWalletRechargeRequest({
+        playerId: Number(demandForm.playerId),
+        amount: Number(demandForm.amount),
+        description: demandForm.description.trim() || null,
+      });
+      setDemandForm((prev) => ({
+        playerId: prev.playerId,
+        amount: "",
+        description: "",
+      }));
+      await refreshWalletData();
+    } catch (err) {
+      console.error("Failed to create recharge demand", err);
+      setFormError(getApiErrorMessage(err, "Could not raise recharge demand"));
+    } finally {
+      setSavingDemand(false);
+    }
+  };
+
+  const handleApproveRequest = async (requestId) => {
+    setApprovingRequestId(requestId);
+    setFormError("");
+
+    try {
+      await approveWalletRechargeRequest(requestId);
+      await refreshWalletData();
+    } catch (err) {
+      console.error("Failed to approve recharge request", err);
+      setFormError(getApiErrorMessage(err, "Could not approve recharge request"));
+    } finally {
+      setApprovingRequestId(null);
+    }
+  };
+
   return (
     <Stack spacing={6}>
       <Box>
         <Heading size="lg">Player Profile</Heading>
         <Text color="gray.600">
-          Keep your details up to date for team selection and wallet tracking.
+          Keep your details up to date, request wallet recharge, and manage captain approvals.
         </Text>
       </Box>
 
@@ -181,11 +351,7 @@ export default function Profile({ currentUser, setUser }) {
 
               <FormControl isInvalid={Boolean(fieldErrors.profileImageUrl)}>
                 <FormLabel>Profile Image URL</FormLabel>
-                <Input
-                  name="profileImageUrl"
-                  value={form.profileImageUrl}
-                  onChange={handleChange}
-                />
+                <Input name="profileImageUrl" value={form.profileImageUrl} onChange={handleChange} />
                 <FormErrorMessage>{fieldErrors.profileImageUrl}</FormErrorMessage>
               </FormControl>
 
@@ -212,8 +378,86 @@ export default function Profile({ currentUser, setUser }) {
           <Stack spacing={4}>
             <Box borderWidth={1} borderRadius="lg" p={6}>
               <Text fontSize="sm" color="gray.500">Wallet Balance</Text>
-              <Heading size="lg">Rs. {wallet?.balance?.toFixed?.(2) ?? "0.00"}</Heading>
+              <Heading size="lg">{formatCurrency(wallet?.balance)}</Heading>
+              <Text mt={2} fontSize="sm" color="gray.600">
+                Recharge requests reflect in wallet only after captain approval.
+              </Text>
             </Box>
+
+            <Box borderWidth={1} borderRadius="lg" p={6}>
+              <Heading size="md" mb={4}>Recharge Wallet</Heading>
+              <Stack spacing={4}>
+                <FormControl>
+                  <FormLabel>Amount</FormLabel>
+                  <Input
+                    name="amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={rechargeForm.amount}
+                    onChange={handleRechargeFormChange}
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Description</FormLabel>
+                  <Input
+                    name="description"
+                    placeholder="Cash, UPI, match collection"
+                    value={rechargeForm.description}
+                    onChange={handleRechargeFormChange}
+                  />
+                </FormControl>
+                <Button colorScheme="green" onClick={handleCreateRechargeRequest} isLoading={savingRecharge}>
+                  Submit Recharge Request
+                </Button>
+              </Stack>
+            </Box>
+
+            {isCaptain && (
+              <Box borderWidth={1} borderRadius="lg" p={6}>
+                <Heading size="md" mb={4}>Raise Recharge Demand</Heading>
+                <Stack spacing={4}>
+                  <FormControl>
+                    <FormLabel>Player</FormLabel>
+                    <Select
+                      name="playerId"
+                      value={demandForm.playerId}
+                      onChange={handleDemandFormChange}
+                      placeholder={captainPlayers.length ? "Select player" : "No captain players found"}
+                    >
+                      {captainPlayers.map((player) => (
+                        <option key={player.id} value={player.id}>
+                          {player.name} - {player.teamName}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Amount</FormLabel>
+                    <Input
+                      name="amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={demandForm.amount}
+                      onChange={handleDemandFormChange}
+                    />
+                  </FormControl>
+                  <FormControl>
+                    <FormLabel>Description</FormLabel>
+                    <Input
+                      name="description"
+                      placeholder="Ask player to recharge for upcoming match"
+                      value={demandForm.description}
+                      onChange={handleDemandFormChange}
+                    />
+                  </FormControl>
+                  <Button colorScheme="orange" onClick={handleCreateDemand} isLoading={savingDemand}>
+                    Raise Demand
+                  </Button>
+                </Stack>
+              </Box>
+            )}
 
             <Box borderWidth={1} borderRadius="lg" p={6}>
               <Heading size="md" mb={4}>My Teams</Heading>
@@ -233,6 +477,59 @@ export default function Profile({ currentUser, setUser }) {
           </Stack>
         </GridItem>
       </Grid>
+
+      <Box borderWidth={1} borderRadius="lg" p={6}>
+        <Heading size="md" mb={4}>Recharge Requests</Heading>
+        {!rechargeRequests.length ? (
+          <Text color="gray.500">No recharge requests yet.</Text>
+        ) : (
+          <Stack spacing={3}>
+            {rechargeRequests.map((request) => {
+              const canApprove = isCaptain && request.status === "PENDING";
+              return (
+                <Box key={request.id} borderWidth={1} borderRadius="md" p={4}>
+                  <Stack
+                    direction={{ base: "column", md: "row" }}
+                    justify="space-between"
+                    align={{ base: "flex-start", md: "center" }}
+                    spacing={4}
+                  >
+                    <Box>
+                      <Stack direction="row" spacing={2} align="center" mb={1}>
+                        <Text fontWeight="semibold">{request.playerName}</Text>
+                        <Badge colorScheme={request.status === "APPROVED" ? "green" : "orange"}>
+                          {request.status}
+                        </Badge>
+                        <Badge colorScheme={request.requestType === "CAPTAIN_DEMAND" ? "purple" : "blue"}>
+                          {request.requestType === "CAPTAIN_DEMAND" ? "Captain Demand" : "Recharge Request"}
+                        </Badge>
+                      </Stack>
+                      <Text>{formatCurrency(request.amount)}</Text>
+                      {request.description && (
+                        <Text fontSize="sm" color="gray.600">{request.description}</Text>
+                      )}
+                      <Text fontSize="sm" color="gray.500" mt={1}>
+                        Raised by {request.requestedByName} on {formatDate(request.requestDate)}
+                        {request.approvedDate ? ` | Approved on ${formatDate(request.approvedDate)}` : ""}
+                      </Text>
+                    </Box>
+
+                    {canApprove && (
+                      <Button
+                        colorScheme="green"
+                        onClick={() => handleApproveRequest(request.id)}
+                        isLoading={approvingRequestId === request.id}
+                      >
+                        Approve Recharge
+                      </Button>
+                    )}
+                  </Stack>
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
+      </Box>
     </Stack>
   );
 }

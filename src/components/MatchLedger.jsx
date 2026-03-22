@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Divider,
   FormControl,
   FormLabel,
   Grid,
@@ -29,7 +28,6 @@ import {
   getCompletedMatches,
   getMatchFinanceOverview,
   recalculateMatchFinance,
-  upsertMatchContribution,
 } from "../api/matchApi";
 import { getApiErrorMessage } from "../utils/apiErrors";
 
@@ -41,14 +39,10 @@ const EMPTY_EXPENSE_FORM = {
   participantPlayerIds: [],
 };
 
-const EMPTY_CONTRIBUTION_FORM = {
-  playerId: "",
-  amount: "",
-};
-
 const EMPTY_DISCOUNT_FORM = {
   playerId: "",
   amount: "",
+  description: "",
 };
 
 const EXPENSE_CATEGORY_OPTIONS = [
@@ -75,12 +69,10 @@ export default function MatchLedger({ currentUser }) {
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [finance, setFinance] = useState(null);
   const [expenseForm, setExpenseForm] = useState(EMPTY_EXPENSE_FORM);
-  const [contributionForm, setContributionForm] = useState(EMPTY_CONTRIBUTION_FORM);
   const [discountForm, setDiscountForm] = useState(EMPTY_DISCOUNT_FORM);
   const [expenseDiscounts, setExpenseDiscounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingExpense, setSavingExpense] = useState(false);
-  const [savingContribution, setSavingContribution] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -100,6 +92,16 @@ export default function MatchLedger({ currentUser }) {
         (team.teamName === selectedMatch.teamA || team.teamName === selectedMatch.teamB)
     );
   }, [currentUser?.teams, selectedMatch]);
+
+  const totalDiscountAmount = useMemo(
+    () => (finance?.players || []).reduce((sum, player) => sum + Number(player.discountAmount || 0), 0),
+    [finance]
+  );
+
+  const lowWalletCount = useMemo(
+    () => (finance?.players || []).filter((player) => player.insufficientWalletBalance).length,
+    [finance]
+  );
 
   useEffect(() => {
     async function loadCompletedMatches() {
@@ -129,17 +131,12 @@ export default function MatchLedger({ currentUser }) {
     async function loadFinance() {
       if (!selectedMatchId) {
         setFinance(null);
-        setContributionForm(EMPTY_CONTRIBUTION_FORM);
         return;
       }
 
       try {
         const response = await getMatchFinanceOverview(selectedMatchId);
         setFinance(response);
-        setContributionForm((prev) => ({
-          ...prev,
-          playerId: prev.playerId || String(response.players[0]?.playerId || ""),
-        }));
         setErrorMessage("");
       } catch (err) {
         console.error("Failed to load match finance", err);
@@ -160,11 +157,6 @@ export default function MatchLedger({ currentUser }) {
 
       return { ...prev, [name]: value };
     });
-  };
-
-  const handleContributionChange = (event) => {
-    const { name, value } = event.target;
-    setContributionForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleDiscountChange = (event) => {
@@ -193,6 +185,7 @@ export default function MatchLedger({ currentUser }) {
         playerName:
           finance?.players?.find((player) => player.playerId === playerId)?.playerName || "Player",
         amount,
+        description: discountForm.description.trim(),
       },
     ]);
     setDiscountForm(EMPTY_DISCOUNT_FORM);
@@ -201,6 +194,15 @@ export default function MatchLedger({ currentUser }) {
 
   const removeDiscount = (playerId) => {
     setExpenseDiscounts((prev) => prev.filter((discount) => discount.playerId !== playerId));
+  };
+
+  const refreshFinance = async () => {
+    if (!selectedMatchId) {
+      return;
+    }
+
+    const refreshed = await getMatchFinanceOverview(selectedMatchId);
+    setFinance(refreshed);
   };
 
   const handleCreateExpense = async () => {
@@ -227,11 +229,11 @@ export default function MatchLedger({ currentUser }) {
         discounts: expenseDiscounts.map((discount) => ({
           playerId: discount.playerId,
           amount: discount.amount,
+          description: discount.description || null,
         })),
       });
 
-      const refreshed = await getMatchFinanceOverview(selectedMatchId);
-      setFinance(refreshed);
+      await refreshFinance();
       setExpenseForm(EMPTY_EXPENSE_FORM);
       setExpenseDiscounts([]);
       setDiscountForm(EMPTY_DISCOUNT_FORM);
@@ -241,37 +243,6 @@ export default function MatchLedger({ currentUser }) {
       setErrorMessage(getApiErrorMessage(err, "Could not create expense"));
     } finally {
       setSavingExpense(false);
-    }
-  };
-
-  const handleSaveContribution = async () => {
-    if (!selectedMatchId) {
-      setErrorMessage("Select a completed match first");
-      return;
-    }
-
-    if (!contributionForm.playerId || contributionForm.amount === "") {
-      setErrorMessage("Player and amount are required");
-      return;
-    }
-
-    setSavingContribution(true);
-
-    try {
-      await upsertMatchContribution(selectedMatchId, {
-        playerId: Number(contributionForm.playerId),
-        amount: Number(contributionForm.amount),
-      });
-
-      const refreshed = await getMatchFinanceOverview(selectedMatchId);
-      setFinance(refreshed);
-      setContributionForm((prev) => ({ ...prev, amount: "" }));
-      setErrorMessage("");
-    } catch (err) {
-      console.error("Failed to save contribution", err);
-      setErrorMessage(getApiErrorMessage(err, "Could not save contribution"));
-    } finally {
-      setSavingContribution(false);
     }
   };
 
@@ -300,7 +271,7 @@ export default function MatchLedger({ currentUser }) {
       <Box>
         <Heading size="lg">Match Ledger</Heading>
         <Text color="gray.600">
-          Record completed-match expenses, collect player contributions, and track settlement balance.
+          View match-specific settlement details and record expenses that adjust player wallet balances.
         </Text>
       </Box>
 
@@ -335,7 +306,7 @@ export default function MatchLedger({ currentUser }) {
             Captain Access
           </Text>
           <Heading size="md" mt={1}>
-            {canManageSelectedMatch ? "Finance entry enabled" : "View only"}
+            {canManageSelectedMatch ? "Expense entry enabled" : "View only"}
           </Heading>
           <Badge mt={2} colorScheme={canManageSelectedMatch ? "green" : "gray"}>
             {canManageSelectedMatch ? "Captain of selected match" : "Not a captain for this match"}
@@ -351,8 +322,7 @@ export default function MatchLedger({ currentUser }) {
       {!selectedMatch ? (
         <Box borderWidth={1} borderRadius="lg" p={6}>
           <Text color="gray.500">
-            No completed matches available yet. Once a captain marks a match completed, it will
-            appear here for finance tracking.
+            No completed matches available yet. Once a captain marks a match completed, it will appear here.
           </Text>
         </Box>
       ) : (
@@ -367,336 +337,211 @@ export default function MatchLedger({ currentUser }) {
               <Heading size="sm" mt={1}>{formatCurrency(finance?.summary?.totalExpenses)}</Heading>
             </Box>
             <Box borderWidth={1} borderRadius="lg" p={5}>
-              <Text fontSize="sm" color="gray.500">Total Contributions</Text>
-              <Heading size="sm" mt={1}>{formatCurrency(finance?.summary?.totalContributions)}</Heading>
+              <Text fontSize="sm" color="gray.500">Total Discounts</Text>
+              <Heading size="sm" mt={1}>{formatCurrency(totalDiscountAmount)}</Heading>
             </Box>
             <Box borderWidth={1} borderRadius="lg" p={5}>
-              <Text fontSize="sm" color="gray.500">Balance Difference</Text>
-              <Heading size="sm" mt={1}>
-                {finance?.summary?.balanceDifference > 0 ? "+" : ""}
-                {formatCurrency(finance?.summary?.balanceDifference)}
-              </Heading>
+              <Text fontSize="sm" color="gray.500">Low Wallet Players</Text>
+              <Heading size="sm" mt={1}>{lowWalletCount}</Heading>
             </Box>
           </SimpleGrid>
 
           {canManageSelectedMatch && (
-            <Grid templateColumns={{ base: "1fr", xl: "1fr 1fr" }} gap={6}>
-              <GridItem>
-                <Box borderWidth={1} borderRadius="lg" p={6}>
-                  <Heading size="md" mb={4}>Add Expense</Heading>
-                  <Grid templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }} gap={4}>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Category</FormLabel>
-                        <Select
-                          name="category"
-                          value={expenseForm.category}
-                          onChange={handleExpenseChange}
-                        >
-                          {EXPENSE_CATEGORY_OPTIONS.map((category) => (
-                            <option key={category.value} value={category.value}>
-                              {category.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Expense Title</FormLabel>
-                        <Input
-                          name="title"
-                          placeholder="Tea, Ground Fees, Boost"
-                          value={expenseForm.title}
-                          onChange={handleExpenseChange}
-                        />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Total Amount</FormLabel>
-                        <Input
-                          name="totalAmount"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={expenseForm.totalAmount}
-                          onChange={handleExpenseChange}
-                        />
-                      </FormControl>
-                    </GridItem>
-                  </Grid>
+            <Box borderWidth={1} borderRadius="lg" p={6}>
+              <Heading size="md" mb={4}>Add Expense</Heading>
+              <Grid templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }} gap={4}>
+                <GridItem>
+                  <FormControl>
+                    <FormLabel>Category</FormLabel>
+                    <Select name="category" value={expenseForm.category} onChange={handleExpenseChange}>
+                      {EXPENSE_CATEGORY_OPTIONS.map((category) => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </GridItem>
+                <GridItem>
+                  <FormControl>
+                    <FormLabel>Expense Title</FormLabel>
+                    <Input
+                      name="title"
+                      placeholder="Tea, Ground Fees, Boost"
+                      value={expenseForm.title}
+                      onChange={handleExpenseChange}
+                    />
+                  </FormControl>
+                </GridItem>
+                <GridItem>
+                  <FormControl>
+                    <FormLabel>Total Amount</FormLabel>
+                    <Input
+                      name="totalAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={expenseForm.totalAmount}
+                      onChange={handleExpenseChange}
+                    />
+                  </FormControl>
+                </GridItem>
+              </Grid>
 
-                  <Grid templateColumns={{ base: "1fr", md: "1fr 2fr auto" }} gap={4} mt={4}>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Allocation</FormLabel>
-                        <Select
-                          name="allocationMode"
-                          value={expenseForm.allocationMode}
-                          onChange={handleExpenseChange}
-                          isDisabled={expenseForm.category === "MATCH_FEE"}
-                        >
-                          <option value="ALL_AVAILABLE">All Available Players</option>
-                          <option value="SELECTED_PLAYERS">Selected Players Only</option>
-                        </Select>
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Optional Participants</FormLabel>
-                        <Select
-                          multiple
-                          height="140px"
-                          value={expenseForm.participantPlayerIds.map(String)}
-                          onChange={handleParticipantSelection}
-                          isDisabled={expenseForm.allocationMode === "ALL_AVAILABLE"}
-                        >
-                          {(finance?.players || []).map((player) => (
-                            <option key={player.playerId} value={player.playerId}>
-                              {player.playerName} - {player.teamName}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </GridItem>
-                    <GridItem display="flex" alignItems="end">
-                      <Button colorScheme="blue" onClick={handleCreateExpense} isLoading={savingExpense} w="full">
-                        Save Expense
-                      </Button>
-                    </GridItem>
-                  </Grid>
+              <Grid templateColumns={{ base: "1fr", md: "1fr 2fr auto" }} gap={4} mt={4}>
+                <GridItem>
+                  <FormControl>
+                    <FormLabel>Allocation</FormLabel>
+                    <Select
+                      name="allocationMode"
+                      value={expenseForm.allocationMode}
+                      onChange={handleExpenseChange}
+                      isDisabled={expenseForm.category === "MATCH_FEE"}
+                    >
+                      <option value="ALL_AVAILABLE">All Available Players</option>
+                      <option value="SELECTED_PLAYERS">Selected Players Only</option>
+                    </Select>
+                  </FormControl>
+                </GridItem>
+                <GridItem>
+                  <FormControl>
+                    <FormLabel>Optional Participants</FormLabel>
+                    <Select
+                      multiple
+                      height="140px"
+                      value={expenseForm.participantPlayerIds.map(String)}
+                      onChange={handleParticipantSelection}
+                      isDisabled={expenseForm.allocationMode === "ALL_AVAILABLE"}
+                    >
+                      {(finance?.players || []).map((player) => (
+                        <option key={player.playerId} value={player.playerId}>
+                          {player.playerName} - {player.teamName}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </GridItem>
+                <GridItem display="flex" alignItems="end">
+                  <Button colorScheme="blue" onClick={handleCreateExpense} isLoading={savingExpense} w="full">
+                    Save Expense
+                  </Button>
+                </GridItem>
+              </Grid>
 
-                  <Box mt={6}>
-                    <Heading size="sm" mb={3}>Player Discounts</Heading>
-                    <Grid templateColumns={{ base: "1fr", md: "2fr 1fr auto" }} gap={4}>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel>Player</FormLabel>
-                          <Select
-                            name="playerId"
-                            value={discountForm.playerId}
-                            onChange={handleDiscountChange}
-                          >
-                            <option value="">Select player</option>
-                            {(finance?.players || []).map((player) => (
-                              <option key={player.playerId} value={player.playerId}>
-                                {player.playerName} - {player.teamName}
-                              </option>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </GridItem>
-                      <GridItem>
-                        <FormControl>
-                          <FormLabel>Discount Amount</FormLabel>
-                          <Input
-                            name="amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={discountForm.amount}
-                            onChange={handleDiscountChange}
-                          />
-                        </FormControl>
-                      </GridItem>
-                      <GridItem display="flex" alignItems="end">
-                        <Button variant="outline" onClick={addDiscount} w="full">
-                          Add Discount
-                        </Button>
-                      </GridItem>
-                    </Grid>
-
-                    {expenseDiscounts.length > 0 && (
-                      <Stack spacing={2} mt={4}>
-                        {expenseDiscounts.map((discount) => (
-                          <Stack
-                            key={discount.playerId}
-                            direction="row"
-                            justify="space-between"
-                            align="center"
-                            borderWidth={1}
-                            borderRadius="md"
-                            p={3}
-                          >
-                            <Text>
-                              {discount.playerName}: {formatCurrency(discount.amount)}
-                            </Text>
-                            <Button size="sm" variant="ghost" onClick={() => removeDiscount(discount.playerId)}>
-                              Remove
-                            </Button>
-                          </Stack>
+              <Box mt={6}>
+                <Heading size="sm" mb={3}>Player Discounts</Heading>
+                <Grid templateColumns={{ base: "1fr", md: "2fr 1fr" }} gap={4}>
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel>Player</FormLabel>
+                      <Select name="playerId" value={discountForm.playerId} onChange={handleDiscountChange}>
+                        <option value="">Select player</option>
+                        {(finance?.players || []).map((player) => (
+                          <option key={player.playerId} value={player.playerId}>
+                            {player.playerName} - {player.teamName}
+                          </option>
                         ))}
-                      </Stack>
-                    )}
-                  </Box>
-                </Box>
-              </GridItem>
+                      </Select>
+                    </FormControl>
+                  </GridItem>
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel>Discount Amount</FormLabel>
+                      <Input
+                        name="amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={discountForm.amount}
+                        onChange={handleDiscountChange}
+                      />
+                    </FormControl>
+                  </GridItem>
+                </Grid>
 
-              <GridItem>
-                <Box borderWidth={1} borderRadius="lg" p={6}>
-                  <Heading size="md" mb={4}>Record Contribution</Heading>
-                  <Grid templateColumns={{ base: "1fr", md: "2fr 1fr auto" }} gap={4}>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Player</FormLabel>
-                        <Select
-                          name="playerId"
-                          value={contributionForm.playerId}
-                          onChange={handleContributionChange}
-                        >
-                          {(finance?.players || []).map((player) => (
-                            <option key={player.playerId} value={player.playerId}>
-                              {player.playerName} - {player.teamName}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </GridItem>
-                    <GridItem>
-                      <FormControl>
-                        <FormLabel>Amount</FormLabel>
-                        <Input
-                          name="amount"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={contributionForm.amount}
-                          onChange={handleContributionChange}
-                        />
-                      </FormControl>
-                    </GridItem>
-                    <GridItem display="flex" alignItems="end">
-                      <Button
-                        colorScheme="green"
-                        onClick={handleSaveContribution}
-                        isLoading={savingContribution}
-                        w="full"
+                <Grid templateColumns={{ base: "1fr", md: "2fr auto" }} gap={4} mt={4}>
+                  <GridItem>
+                    <FormControl>
+                      <FormLabel>Description</FormLabel>
+                      <Input
+                        name="description"
+                        placeholder="Reason for discount"
+                        value={discountForm.description}
+                        onChange={handleDiscountChange}
+                      />
+                    </FormControl>
+                  </GridItem>
+                  <GridItem display="flex" alignItems="end">
+                    <Button variant="outline" onClick={addDiscount} w="full">
+                      Add Discount
+                    </Button>
+                  </GridItem>
+                </Grid>
+
+                {expenseDiscounts.length > 0 && (
+                  <Stack spacing={2} mt={4}>
+                    {expenseDiscounts.map((discount) => (
+                      <Stack
+                        key={discount.playerId}
+                        direction={{ base: "column", md: "row" }}
+                        justify="space-between"
+                        align={{ base: "flex-start", md: "center" }}
+                        borderWidth={1}
+                        borderRadius="md"
+                        p={3}
                       >
-                        Save Contribution
-                      </Button>
-                    </GridItem>
-                  </Grid>
-                </Box>
-              </GridItem>
-            </Grid>
+                        <Box>
+                          <Text fontWeight="semibold">
+                            {discount.playerName}: {formatCurrency(discount.amount)}
+                          </Text>
+                          {discount.description && (
+                            <Text fontSize="sm" color="gray.600">{discount.description}</Text>
+                          )}
+                        </Box>
+                        <Button size="sm" variant="ghost" onClick={() => removeDiscount(discount.playerId)}>
+                          Remove
+                        </Button>
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            </Box>
           )}
-
-          <Grid templateColumns={{ base: "1fr", xl: "1fr 1fr" }} gap={6}>
-            <GridItem>
-              <Box borderWidth={1} borderRadius="lg" p={6}>
-                <Heading size="md" mb={4}>Expenses</Heading>
-                {!finance?.expenses?.length ? (
-                  <Text color="gray.500">No expenses recorded for this match yet.</Text>
-                ) : (
-                  <TableContainer>
-                    <Table variant="simple">
-                      <Thead>
-                        <Tr>
-                          <Th>Title</Th>
-                          <Th>Category</Th>
-                          <Th>Type</Th>
-                          <Th isNumeric>Total</Th>
-                          <Th isNumeric>Split</Th>
-                          <Th isNumeric>Per Player</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {finance.expenses.map((expense) => (
-                          <Tr key={expense.id}>
-                            <Td>{expense.title}</Td>
-                            <Td>{expense.category}</Td>
-                            <Td>{expense.mandatoryForAvailablePlayers ? "Mandatory" : "Optional"}</Td>
-                            <Td isNumeric>{formatCurrency(expense.totalAmount)}</Td>
-                            <Td isNumeric>{expense.splitCount}</Td>
-                            <Td isNumeric>{formatCurrency(expense.perPlayerAmount)}</Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </Box>
-            </GridItem>
-
-            <GridItem>
-              <Box borderWidth={1} borderRadius="lg" p={6}>
-                <Heading size="md" mb={4}>Contributions</Heading>
-                {!finance?.contributions?.length ? (
-                  <Text color="gray.500">No contributions recorded for this match yet.</Text>
-                ) : (
-                  <TableContainer>
-                    <Table variant="simple">
-                      <Thead>
-                        <Tr>
-                          <Th>Player</Th>
-                          <Th isNumeric>Amount</Th>
-                          <Th>Date</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {finance.contributions.map((contribution) => (
-                          <Tr key={contribution.id}>
-                            <Td>{contribution.playerName}</Td>
-                            <Td isNumeric>{formatCurrency(contribution.amount)}</Td>
-                            <Td>{formatDate(contribution.contributionDate)}</Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </Box>
-            </GridItem>
-          </Grid>
 
           <Box borderWidth={1} borderRadius="lg" p={6}>
             <Heading size="md" mb={4}>Player Settlement</Heading>
             {!finance?.players?.length ? (
               <Text color="gray.500">No players available for this match.</Text>
             ) : (
-              <>
-                <TableContainer>
-                  <Table variant="simple">
-                    <Thead>
-                      <Tr>
-                        <Th>Player</Th>
-                        <Th>Team</Th>
-                        <Th isNumeric>Payable</Th>
-                        <Th isNumeric>Contribution</Th>
-                        <Th isNumeric>Match Balance</Th>
-                        <Th isNumeric>Wallet Balance</Th>
+              <TableContainer>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Player</Th>
+                      <Th isNumeric>Payable</Th>
+                      <Th isNumeric>Discount</Th>
+                      <Th isNumeric>Match Balance</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {finance.players.map((player) => (
+                      <Tr key={player.playerId} bg={player.insufficientWalletBalance ? "red.50" : undefined}>
+                        <Td>
+                          <Stack direction="row" spacing={2} align="center">
+                            <Text>{player.playerName}</Text>
+                            {player.playerId === currentUser?.id && <Badge colorScheme="blue">You</Badge>}
+                            {player.insufficientWalletBalance && <Badge colorScheme="red">Low Wallet</Badge>}
+                          </Stack>
+                        </Td>
+                        <Td isNumeric>{formatCurrency(player.payableAmount)}</Td>
+                        <Td isNumeric>{formatCurrency(player.discountAmount)}</Td>
+                        <Td isNumeric>{formatCurrency(player.matchBalance)}</Td>
                       </Tr>
-                    </Thead>
-                    <Tbody>
-                      {finance.players.map((player) => (
-                        <Tr key={player.playerId}>
-                          <Td>
-                            <Stack direction="row" spacing={2} align="center">
-                              <Text>{player.playerName}</Text>
-                              {player.playerId === currentUser?.id && <Badge colorScheme="blue">You</Badge>}
-                            </Stack>
-                          </Td>
-                          <Td>{player.teamName}</Td>
-                          <Td isNumeric>{formatCurrency(player.payableAmount)}</Td>
-                          <Td isNumeric>{formatCurrency(player.contributionAmount)}</Td>
-                          <Td isNumeric>{formatCurrency(player.matchBalance)}</Td>
-                          <Td isNumeric>{formatCurrency(player.walletBalance)}</Td>
-                        </Tr>
-                      ))}
-                    </Tbody>
-                  </Table>
-                </TableContainer>
-
-                <Divider my={4} />
-                <Stack direction="row" justify="space-between">
-                  <Text fontWeight="semibold">Settlement Difference</Text>
-                  <Text fontWeight="bold">
-                    {finance?.summary?.balanceDifference > 0 ? "+" : ""}
-                    {formatCurrency(finance?.summary?.balanceDifference)}
-                  </Text>
-                </Stack>
-              </>
+                    ))}
+                  </Tbody>
+                </Table>
+              </TableContainer>
             )}
           </Box>
         </>

@@ -21,6 +21,11 @@ export const getNextMatchSquad = async () => {
   return res.data;
 };
 
+export const getMatchPlayers = async (matchId) => {
+  const res = await apiClient.get(`/matches/${matchId}/players`);
+  return res.data;
+};
+
 export const createMatch = async (match) => {
   const res = await apiClient.post("/matches", match);
   return res.data;

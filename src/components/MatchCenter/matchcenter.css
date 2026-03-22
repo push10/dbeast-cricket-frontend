@@ -60,6 +60,11 @@
   box-shadow: 0 14px 30px rgba(18, 52, 59, 0.18);
 }
 
+.match-card.selected {
+  outline: 3px solid #ffd166;
+  outline-offset: 2px;
+}
+
 .carousel-card {
   scroll-snap-align: start;
   min-height: 230px;
@@ -108,6 +113,11 @@
   transition: width 0.3s ease-in-out;
 }
 
+.match-card-actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .availability-btn {
   width: 100%;
   border: none;
@@ -137,6 +147,12 @@
   color: #083d35;
 }
 
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 .squad-panel {
   background: linear-gradient(180deg, #f9fbfc 0%, #eef4f7 100%);
   border-radius: 24px;
@@ -157,10 +173,59 @@
   white-space: nowrap;
 }
 
-.squad-grid {
+.team-roster-groups {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.team-roster-group {
+  display: grid;
+  gap: 1rem;
+}
+
+.team-roster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #12343b 0%, #21515b 100%);
+  color: #fff;
+}
+
+.team-roster-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.team-roster-header p {
+  margin: 0.25rem 0 0;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.team-roster-badge {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.squad-grid,
+.roster-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
+}
+
+.squad-card,
+.roster-card {
+  background: #fff;
+  border: 1px solid #dde7ee;
+  border-radius: 18px;
+  padding: 1rem;
 }
 
 .squad-card {
@@ -168,10 +233,23 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: center;
-  background: #fff;
-  border: 1px solid #dde7ee;
-  border-radius: 18px;
-  padding: 1rem;
+}
+
+.roster-card {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.roster-card.is-available {
+  border-color: #b7e4d6;
+  box-shadow: 0 10px 24px rgba(6, 214, 160, 0.08);
+}
+
+.roster-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
 }
 
 .squad-player-name {
@@ -179,20 +257,29 @@
   color: #122c34;
 }
 
-.squad-player-meta {
+.squad-player-meta,
+.roster-player-mobile {
   margin-top: 0.3rem;
   color: #52616b;
   font-size: 0.92rem;
 }
 
-.squad-remove-btn {
-  border: none;
-  background: #b42318;
-  color: #fff;
-  border-radius: 10px;
-  padding: 0.65rem 0.8rem;
+.availability-pill {
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  cursor: pointer;
+  white-space: nowrap;
+}
+
+.availability-pill.active {
+  background: #dff7ee;
+  color: #0f6b4b;
+}
+
+.availability-pill.inactive {
+  background: #f3f4f6;
+  color: #52616b;
 }
 
 .empty-state {
@@ -205,7 +292,9 @@
 
 @media (max-width: 768px) {
   .section-heading,
-  .squad-card {
+  .squad-card,
+  .roster-card-top,
+  .team-roster-header {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -213,8 +302,28 @@
   .match-carousel {
     grid-auto-columns: minmax(260px, 88vw);
   }
+}
 
-  .squad-remove-btn {
-    width: 100%;
-  }
+.roster-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.filter-chip {
+  border: 1px solid #c9d6df;
+  background: #fff;
+  color: #12343b;
+  border-radius: 999px;
+  padding: 0.6rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-chip.active {
+  background: #12343b;
+  color: #fff;
+  border-color: #12343b;
 }

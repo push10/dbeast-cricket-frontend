@@ -32,6 +32,21 @@ export const updateMyProfile = async (payload) => {
   return res.data;
 };
 
+export const getMyWalletRechargeRequests = async () => {
+  const res = await apiClient.get("/players/me/wallet/recharge-requests");
+  return res.data;
+};
+
+export const createWalletRechargeRequest = async (payload) => {
+  const res = await apiClient.post("/players/me/wallet/recharge-requests", payload);
+  return res.data;
+};
+
+export const approveWalletRechargeRequest = async (requestId) => {
+  const res = await apiClient.post(`/players/me/wallet/recharge-requests/${requestId}/approve`);
+  return res.data;
+};
+
 export const persistSession = (loginResponse, profile) => {
   setToken(loginResponse.token);
   setCurrentUser({
